@@ -55,8 +55,15 @@ def public():
 def authhost():
  return request.headers.get('X-Host-Pin')==HOST_PIN
 def findteam():
- token=request.headers.get('X-Team-Token','')
+ token=request.headers.get('X-Team-Token','').strip()
+ if not token: return None
  return next((t for t in TEAMS if secrets.compare_digest(t['token'],token)),None)
+@app.errorhandler(403)
+def forbidden(error):
+ return jsonify(error='Багийн холбоос хүчингүй байна. Багшаас шинэ QR код уншуулна уу.'),403
+@app.errorhandler(404)
+def not_found(error):
+ return jsonify(error='Хүссэн хаяг олдсонгүй.'),404
 @app.get('/')
 def home():return render_template('game.html')
 @app.get('/api/state')
@@ -74,7 +81,7 @@ def start():
 @app.post('/api/answer')
 def answer():
  t=findteam()
- if not t:abort(403)
+ if not t:return jsonify(error='Багийн QR холбоос хүчингүй эсвэл хуучирсан байна. Шинэ QR код уншуулна уу.'),403
  d=request.get_json(silent=True) or {}
  try: choice=int(d.get('choice'))
  except (ValueError,TypeError):return jsonify(error='Хариулт буруу'),400
@@ -140,7 +147,7 @@ def team_qr(team_id):
 @app.get('/api/identify')
 def identify():
  t=findteam()
- if not t:abort(403)
+ if not t:return jsonify(error='Багийн холбоос хүчингүй. Багшийн дэлгэцээс шинэ QR код уншуулна уу.'),403
  return jsonify({'id':t['id'],'name':t['name'],'year':t['year']})
 if __name__=='__main__':
  print('HOST PIN:',HOST_PIN,flush=True)
