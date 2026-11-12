@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: economy-command-live-5teams
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 120
+    envVars:
+      - key: HOST_PIN
+        generateValue: true
