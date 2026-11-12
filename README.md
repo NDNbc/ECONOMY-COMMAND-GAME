@@ -10,3 +10,7 @@ Environment: `HOST_PIN`, `DATABASE_URL` (байнгын хадгалалтад �
 GitHub-д ZIP доторх файлуудыг (ZIP өөрийг нь биш) оруулж commit хийнэ. `data.json`-ийн түүхэн үйл явдлууд хэвээр.
 
 **Анхаарах:** Өмнөх тоглолтын хадгалсан төлөвт `round` талбар байхгүй бол багийн `log` уртаар сэргээнэ. Өмнөх дуусаагүй тоглолтыг шинэ логикт шилжүүлэхээс өмнө JSON экспорт хийж, шинэ тоглолт эхлүүлэх нь найдвартай.
+
+
+## QR auto-sync
+Host and projector both poll /api/links every 3 seconds. QR images and team links are regenerated only if the server's current team tokens, names or years change. Cache-busting version ensures fresh QR. Keep DATABASE_URL configured for durable state.
