@@ -99,5 +99,31 @@ function render(){
 }
 async function refresh(){try{let d=await api('state');if(!game||d.revision!==game.revision){let old=game?.teams?.find(t=>t.id===links[0]?.id)?.round;game=d;let now=game.teams?.find(t=>t.id===links[0]?.id)?.round;if(old!==undefined&&old!==now)selected=null;render()}}catch(e){$('status').textContent='Сервертэй холбогдохгүй байна: '+e.message}}
 async function action(endpoint,body={}){try{game=await api(endpoint,'POST',body);render()}catch(e){alert(e.message)}}$('start').onclick=()=>action('start',{names:game.teams.map(t=>$('name'+t.id).value)});$('reveal').onclick=()=>action('reveal');$('presentNext').onclick=()=>action('present-next');$('next').onclick=()=>action('next');$('reset').onclick=()=>{if(confirm('Тоглоомын явцыг арилгах уу?'))action('reset')};$('project').onclick=()=>window.open(location.origin+'/?role=projector&pin='+encodeURIComponent(pin),'projector','width=1440,height=900');$('send').onclick=async()=>{try{let d=await api('answer','POST',{choice:selected});selected=null;game=d.state;render()}catch(e){alert(e.message)}};
-async function boot(){if(projector){try{links=await api('links');$('projectorQrs').innerHTML=links.map(t=>`<div class="lobbyQrCard"><div class="lobbyTeam">${esc(t.name)}</div><div class="lobbyYear">${t.year} ОН</div><img alt="${esc(t.name)} QR" src="/api/qr/${t.id}?pin=${encodeURIComponent(pin)}"><div class="lobbyHint">УТСААР УНШУУЛ</div></div>`).join('')}catch(e){$('projectorQrs').textContent='QR код ачаалагдсангүй. Багшийн PIN тохиргоо болон серверийн холболтыг шалгана уу.'}}if(host){try{links=await api('links');$('links').innerHTML='<h3>БАГ БҮРИЙН QR КОД — УТСААР УНШУУЛНА</h3><div class="qrgrid">'+links.map(t=>`<div class="qrbox"><h3>${esc(t.name)} · ${t.year}</h3><img alt="${esc(t.name)} QR" src="/api/qr/${t.id}?pin=${encodeURIComponent(pin)}" data-qr="${t.id}"><a style="color:#8cf4ff;overflow-wrap:anywhere" href="${location.origin}/?role=team&token=${encodeURIComponent(t.token)}" target="_blank">Багийн холбоос нээх</a></div>`).join('')+'</div>'+'<p class="notice">Эдгээр холбоос нь тухайн багийн нэвтрэх эрх тул зөвхөн холбогдох багт илгээнэ үү.</p>'}catch(e){$('status').textContent='Багшийн PIN буруу эсвэл дутуу байна: '+e.message}}if(student){try{let d=await fetch('/api/identify',{headers:{'X-Team-Token':teamToken}});if(d.ok)links=[await d.json()];else {let err=await d.json().catch(()=>({}));throw Error(err.error||'Багийн холбоос буруу. Шинэ QR код уншуулна уу.')} }catch(e){$('status').textContent=e.message;$('teamTitle').innerHTML='<h2>Багийн холбоос хүчингүй</h2>';$('question').textContent=e.message;document.body.classList.add('team-waiting')}}await refresh();setInterval(refresh,1500)}boot();
+let qrSignature='',qrBusy=false;
+async function syncQrs(){
+ if(!(host||projector)||qrBusy)return;
+ qrBusy=true;
+ try{
+  const current=await api('links');
+  const signature=JSON.stringify(current.map(t=>[t.id,t.name,t.year,t.token]));
+  if(signature===qrSignature)return;
+  qrSignature=signature;links=current;
+  const stamp=Date.now();
+  const qrSrc=t=>'/api/qr/'+t.id+'?pin='+encodeURIComponent(pin)+'&v='+stamp;
+  if(projector){
+   $('projectorQrs').innerHTML=current.map(t=>`<div class="lobbyQrCard"><div class="lobbyTeam">${esc(t.name)}</div><div class="lobbyYear">${esc(t.year)} ОН</div><img alt="${esc(t.name)} QR" src="${qrSrc(t)}"><div class="lobbyHint">УТСААР УНШУУЛ</div></div>`).join('');
+  }
+  if(host){
+   $('links').innerHTML='<h3>БАГ БҮРИЙН QR КОД — УТСААР УНШУУЛНА</h3><div class="qrgrid">'+current.map(t=>`<div class="qrbox"><h3>${esc(t.name)} · ${esc(t.year)}</h3><img alt="${esc(t.name)} QR" src="${qrSrc(t)}"><a style="color:#8cf4ff;overflow-wrap:anywhere" href="${location.origin}/?role=team&token=${encodeURIComponent(t.token)}" target="_blank" rel="noopener">Багийн холбоос нээх</a></div>`).join('')+'</div><p class="notice">Багш болон проекторын QR кодууд серверийн одоогийн токентой автоматаар синхрончлогдоно.</p>';
+  }
+ }catch(e){
+  if(!qrSignature){if(projector)$('projectorQrs').textContent='QR код ачаалагдсангүй. PIN болон серверийн холболтыг шалгана уу.';if(host)$('links').textContent='QR код ачаалагдсангүй: '+e.message;}
+ }finally{qrBusy=false;}
+}
+async function boot(){
+ if(host||projector){await syncQrs();setInterval(syncQrs,3000);}
+ if(student){try{let d=await fetch('/api/identify',{headers:{'X-Team-Token':teamToken}});if(d.ok)links=[await d.json()];else {let err=await d.json().catch(()=>({}));throw Error(err.error||'Багийн холбоос буруу. Шинэ QR код уншуулна уу.')} }catch(e){$('status').textContent=e.message;$('teamTitle').innerHTML='<h2>Багийн холбоос хүчингүй</h2>';$('question').textContent=e.message;document.body.classList.add('team-waiting')}}
+ await refresh();setInterval(refresh,1500);
+}
+boot();
 </script></body></html>
