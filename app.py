@@ -41,6 +41,47 @@ for t in TEAMS:t.setdefault('round',0)
 initialize_store()
 def score(t):
  b,d,g,s=t['stats'];return round((b+100-d+g+s)/4)
+def evaluate_teams(teams):
+ # Each metric is evaluated relative to its own starting condition, not raw final score.
+ # Debt is a cost (lower is better); all other indices are benefits (higher is better).
+ weights=[35,25,15,25]  # budget, debt, economic activity, social outcome
+ labels=['Төсвийн тэнцэл','Өрийн дарамт','Эдийн засгийн идэвхжил','Нийгмийн үр дүн']
+ results=[]
+ for t in teams:
+  base=DATA[t['year']]['base']
+  final=t['stats']
+  metrics=[]
+  total=0
+  for i,(start,end,w) in enumerate(zip(base,final,weights)):
+   delta=(start-end) if i==1 else (end-start)
+   # Symmetric normalization by available room in the direction of change.
+   room=(start if i==1 else 100-start) if delta>=0 else (100-start if i==1 else start)
+   progress=round(100*delta/max(room,1),1)
+   contribution=round(w*progress/100,2)
+   total+=contribution
+   metrics.append({'name':labels[i],'start':start,'end':end,'change':end-start,'progress':progress,'weight':w,'contribution':contribution,'improved':delta>0})
+  strongest=max(metrics,key=lambda x:x['contribution'])
+  weakest=min(metrics,key=lambda x:x['contribution'])
+  good=[m['name'] for m in metrics if m['contribution']>0]
+  bad=[m['name'] for m in metrics if m['contribution']<0]
+  decisions=[]
+  for l in t.get('log',[]):
+   d=l.get('delta',[])
+   benefit=sum(v*w*(-1 if i==1 else 1) for i,(v,w) in enumerate(zip(d,weights)))
+   decisions.append({'round':l.get('round'),'title':l.get('title'),'choice':l.get('choice'),'explanation':l.get('explanation'),'impact':round(benefit,1)})
+  decisions.sort(key=lambda d:d['impact'])
+  results.append({'id':t['id'],'name':t['name'],'year':t['year'],'initial_score':score({'stats':base}),'final_score':score(t),'score_change':score(t)-score({'stats':base}),'evaluation':round(total,2),'metrics':metrics,'strongest':strongest['name'],'weakest':weakest['name'],'improved':good,'declined':bad,'best_decisions':list(reversed(decisions[-2:])),'risky_decisions':decisions[:2]})
+ results.sort(key=lambda x:(-x['evaluation'],-x['final_score'],x['id']))
+ for rank,r in enumerate(results,1):
+  r['rank']=rank
+  if rank==1:
+   r['summary']=f"Анхны нөхцөлтэй харьцуулахад {r['strongest'].lower()} хамгийн сайн ахисан. Дөрвөн шалгуурын жигнэсэн өөрчлөлтөөр тэргүүлсэн тул шилдэг төсвийн удирдлагатай багаар шалгарлаа."
+  else:
+   lead=results[0]['evaluation']-r['evaluation']
+   weak=r['weakest'].lower()
+   r['summary']=f"Ялагч багаас жигнэсэн ахицын үнэлгээгээр {lead:.2f} нэгжээр хоцорсон. Хамгийн сул үзүүлэлт нь {weak}; энэ үзүүлэлтийн өөрчлөлт нийт үнэлгээг бууруулсан."
+ return {'method':'Анхны үзүүлэлтээс өөрчлөгдсөн хувь (сайжрах боломжтой зайд харьцуулсан) × шалгуурын жин. Өр буурах нь эерэг. Сургалтын симуляцийн индекс, бодит макро статистик биш.','weights':dict(zip(labels,weights)),'winner_id':results[0]['id'],'ranked':results}
+
 def public():
  with LOCK:
   phase=GAME['phase']
@@ -51,7 +92,7 @@ def public():
    if r<len(DATA[t['year']]['events']):
     e=DATA[t['year']]['events'][r]
     events[str(t['id'])]={'title':e[0],'desc':e[1],'options':[{'title':c[0],'desc':c[1]} for c in e[2]]}
-  return {'round':GAME['round'],'phase':phase,'revision':GAME['revision'],'max_rounds':max(len(DATA[y]['events']) for y in YEARS), 'mode':'independent','submitted':[t['id'] for t in TEAMS if t.get('round',0)>=len(DATA[t['year']]['events'])], 'teams':teams,'events':events,'last':GAME.get('last'),'reveal_index':0}
+  return {'round':GAME['round'],'phase':phase,'revision':GAME['revision'],'max_rounds':max(len(DATA[y]['events']) for y in YEARS), 'mode':'independent','submitted':[t['id'] for t in TEAMS if t.get('round',0)>=len(DATA[t['year']]['events'])], 'teams':teams,'events':events,'last':GAME.get('last'),'reveal_index':0,'evaluation':evaluate_teams(TEAMS) if phase=='finished' else None}
 def authhost():
  return request.headers.get('X-Host-Pin')==HOST_PIN
 def findteam():

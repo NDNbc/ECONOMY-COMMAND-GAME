@@ -14,3 +14,9 @@ GitHub-д ZIP доторх файлуудыг (ZIP өөрийг нь биш) о�
 
 ## QR auto-sync
 Host and projector both poll /api/links every 3 seconds. QR images and team links are regenerated only if the server's current team tokens, names or years change. Cache-busting version ensures fresh QR. Keep DATABASE_URL configured for durable state.
+
+
+## 10 decisions per team (2004–2008)
+Each year now has 10 unique scenarios and 4 policy choices per scenario (50 scenarios total). Existing independent progression, QR, persistence, teacher/projector interface and score logic are unchanged. Effects are educational simulation values, not observed historical outcomes.
+
+IMPORTANT: Existing saved game_state in PostgreSQL may contain teams partway through a previous game. To start a new 10-round session, use the teacher's Reset button (which archives previous state), then Start. Do not delete your database.
